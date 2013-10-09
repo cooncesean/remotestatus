@@ -2,10 +2,12 @@
 
 {% block content %}
     <h1>Current Remote Box Status</h1>
+
     <p class='fl'>
         Last Updated On:
-        <form>
-            <select name='call_round' style='margin-top:-1px;margin-left:10px;'>
+        <form id='change-round-form' method='post' action='{% url rs-dashboard %}'>
+            {% csrf_token %}
+            <select onchange='submitForm();' name='call_round' style='margin-top:-1px;margin-left:10px;'>
                 {% for cr in call_rounds %}
                     <option {% if cr == call_round %}selected='True'{% endif %} value='{{ cr.id }}'>{{ cr }}</option>
                 {% endfor %}
@@ -13,6 +15,11 @@
         </form>
     </p>
 
-    {% include 'remotestatus/status_history_table.html' %}
+    <script>
+        function submitForm(){
+            document.getElementById('change-round-form').submit();
+        }
+    </script>
 
+    {% include 'remotestatus/status_history_table.html' %}
 {% endblock %}
