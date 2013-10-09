@@ -1,4 +1,5 @@
-from distutils.core import setup
+# from distutils.core import setup
+from setuptools import setup
 
 setup(
     name='remotestatus',
@@ -11,9 +12,9 @@ setup(
     license='LICENSE.txt',
     long_description='More info can be found at: http://github.com/cooncesean/remotestatus',
     install_requires=[
-        'redis>=2.8.0',         # Datastore for the status values
-        'django-celery>=3.0.1'  # To run the status checks as periodic tasks
-        'paramiko>=1.11.1'      # To make the remote calls to the boxes
-        'django>=1.4.1'         # To make the remote calls to the boxes
+        'redis>=2.7.1',          # Datastore for the status values
+        'django-celery>=3.0.1',  # To run the status checks as periodic tasks
+        'paramiko>=1.11.1',      # To make the remote calls to the boxes
+        'django>=1.4.1',         # To make the remote calls to the boxes
     ],
 )

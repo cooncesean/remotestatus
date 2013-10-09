@@ -1,0 +1,7 @@
+{% extends 'remotestatus/base.html' %}
+
+{% block content %}
+    <h1><a href='{% url rs-dashboard %}'>Dashboard</a> &raquo; Status History for {{ remote_box.nickname }}</h1>
+
+    {% include 'remotestatus/status_history_table.html' with show_date=1 %}
+{% endblock %}

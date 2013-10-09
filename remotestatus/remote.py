@@ -1,19 +1,24 @@
-from paramiko import SSHClient
+import json
 
-from django.settings import conf
+from paramiko import SSHClient
+from paramiko.transport import ChannelException
+
+from remotestatus.conf import DEFAULT_PROXY_HOSTNAME, DEFAULT_PROXY_USERNAME, \
+    DEFAULT_PROXY_PORT, DEFAULT_KEY_FILE, DEFAULT_KNOWN_HOSTS_FILE
+from remotestatus.models import StatusHistory, RemoteBoxModel
 
 
 class RemoteManager(object):
     """
-    Responsible for parsing the remote boxes config file and
-    instantiating the appropriate `RemoteBox` objects for each
-    line in the config.
+    This class is used as a singleton and maintains an
+    internal registry of 'discovered' and parsed `RemoteBoxes`
+    according to the project's config.
     """
     def __init__(self):
-        self.registry = set()
+        self.registry = {}
 
     def register_remote_box(self, remote_box):
-        self.registry.add(remote_box)
+        self.registry.update({remote_box.nickname: remote_box})
 
 remote_manager = RemoteManager()
 
@@ -23,12 +28,12 @@ class RemoteBox(object):
     to check their status and the status of any optional processes
     we expect them to be running.
 
-    Assumes we're working with a PROXY host.
+    Assumes we're working with a proxy host and tunneling to the remote
+    boxes.
     """
     def __init__(self, nickname, description, remote_username,
         remote_password,
         remote_port, forwarded_port, processes=[]):
-        self._client = None
         self.nickname = nickname
         self.description = description
         self.remote_username = remote_username
@@ -38,51 +43,98 @@ class RemoteBox(object):
         self.forwarded_port = forwarded_port
         self.processes = processes
 
-    def get_client(self):
-        " Return an instance of a connected and active `paramiko.SSHClient`. "
-        # Use existing connection if active
-        if self._client:
-            return self._client
-
-        # Create the client and connect to proxy server
-        client = SSHClient()
-        client.load_host_keys(hosts_file)
-        client.connect(
-            settings.PROXY_HOSTNAME,
-            port=settings.PROXY_PORT,
-            username=settings.PROXY_USERNAME,
-            key_filename=key_filename
-        )
-
-        # Get the transport and find create a `direct-tcpip` channel
-        transport = client.get_transport()
-        dest_addr = ('0.0.0.0', dest_port)
-        src_addr = ('127.0.0.1', local_port)
-        channel = transport.open_channel("direct-tcpip", dest_addr, src_addr)
-
-        self._client = SSHClient()
-        target_client.load_host_keys(hosts_file)
-        target_client.connect('localhost', port=local_port, username=dest_username, password=dest_password, sock=channel)
-        return target_client
-
-        # command = 'ps aux | grep %s' % cmd
-        # # print 'command', command
-        # x, stdout, e = target_client.exec_command(command)
-        # print stdout.readlines()
-
     def check_remote_status(self):
         """
         Make a call to check the status of a box and to optionally
         check the status of any processes specified in the config
         for the particular box.
 
-        It returns a tuple of status':
-            (True/False, [{'proc1': True, 'proc2': False, etc...}])
-            (Box (Up/Down), Process Statuses: (List of dictionaries [{'proc1': Up/Down}, etc...])
+        Returns a tuple of statuses:
+            1. Box Status: True/False if the box is reachable/unreachable
+            2. Process Statuses: A dictionary of processes (keyed by
+               self.processes) and each of their statuses (True/False
+               if they are running/not running).
+        Sample Response:
+            >>> box = RemoteBox(...., processes=['foo', 'bar'])
+            >>> box.check_remote_status()
+            >>>
+            >>> # Box is up; `foo` is running; `bar` is not running
+            >>> (True, {'foo': True, 'bar': False})
         """
+        box_status = False
+        proc_statuses = {}
+
+        # Create the client and connect to proxy server
+        # NOTE: I would love to move this connection logic to a
+        #       `get_client()` method but it appears paramiko's SSHClient
+        #       disconnects after it loses scope - even if attempting to
+        #       save the `client` as a class variable. Any refactor help
+        #       would be appreciated.
+        #           - http://stackoverflow.com/a/17317516/329902
+        try:
+            proxy_client = SSHClient()
+            proxy_client.load_host_keys(DEFAULT_KNOWN_HOSTS_FILE)
+            proxy_client.connect(
+                DEFAULT_PROXY_HOSTNAME,
+                port=DEFAULT_PROXY_PORT,
+                username=DEFAULT_PROXY_USERNAME,
+                key_filename=DEFAULT_KEY_FILE
+            )
+
+            # Get the transport and find create a `direct-tcpip` channel
+            transport = proxy_client.get_transport()
+            dest_addr = ('0.0.0.0', self.remote_port)
+            src_addr = ('127.0.0.1', self.forwarded_port)
+            channel = transport.open_channel("direct-tcpip", dest_addr, src_addr)
+
+            # Create a connection to the remote box through the tunnel
+            remote_client = SSHClient()
+            remote_client.load_host_keys(DEFAULT_KNOWN_HOSTS_FILE)
+            remote_client.connect(
+                'localhost',
+                port=self.forwarded_port,
+                username=self.remote_username,
+                password=self.remote_password,
+                sock=channel
+            )
+
+            # The remote box is up
+            box_status = True
+
+        # If we cannot connect to the box, assume that all processes are down as well
+        except ChannelException:
+            for proc in self.processes:
+                proc_statuses.update({proc: False})
+            return (box_status, proc_statuses)
+
+        # Box is up, check the status of each process in the list
+        for proc in self.processes:
+            print 'executing command: `%s`' % proc
+            x, stdout, e = remote_client.exec_command('ps aux | grep %s | grep -v grep' % proc)
+            out = stdout.readlines()
+            print 'out', out
+            print '-------'
+            proc_statuses.update({proc: len(out) > 0})
+
+        return (box_status, proc_statuses)
 
     def notify_user(self, email_addresses):
         " Notify the necessary users when a box is not responsive. "
 
-    def update_data(self):
-        " Update the StatusHistory table with the table's findings. "
+    def save_status_history(self, call_round, status):
+        """
+        Update the StatusHistory table with the RemoteBox's status findings.
+        Takes a `call_round` so we can group this StatusHistory record with
+        similar records made at the same time.
+        """
+        # Normalize the remote box based on its nickname
+        remote_box, _ = RemoteBoxModel.objects.get_or_create(nickname=self.nickname)
+
+        # Create a new StatusHistory record
+        StatusHistory.objects.create(
+            call_round=call_round,
+            remote_box=remote_box,
+            description=self.description,
+            box_status=status[0],
+            processes_output=json.dumps(status[1])
+        )

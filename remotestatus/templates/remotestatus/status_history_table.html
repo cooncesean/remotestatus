@@ -1,0 +1,44 @@
+<table>
+    <thead>
+        <tr>
+            <th class='left'>
+                Remote Box Nickname
+            </th>
+            {% if show_date %}
+                <th>
+                    Date Checked
+                </th>
+            {% endif %}
+            <th>
+                Box Status
+            </th>
+            <th class='left'>
+                Process Status
+            </th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for status_history in status_histories %}
+            <tr class='{% if status_history.box_status %}up{% else %}down{% endif %}'>
+                <td class='left'>
+                    <strong><a href='{{ status_history.remote_box.get_absolute_url }}'>{{ status_history.remote_box.nickname }}</a></strong>
+                </td>
+                {% if show_date %}
+                    <td>
+                        {{ status_history.call_round.date_checked }}
+                    </td>
+                {% endif %}
+                <td>
+                    {% if status_history.box_status %}
+                        UP
+                    {% else %}
+                        DOWN
+                    {% endif %}
+                </td>
+                <td class='left processes'>
+                    {{ status_history.processes_display|safe }}
+                </td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>

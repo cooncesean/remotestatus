@@ -2,12 +2,10 @@
 Discover, parse and initialize a RemoteManager
 using the configuration specified by the Django project.
 """
-import inspect
-
 from django.conf import settings
 from django.utils.importlib import import_module
 
-from remotestatus.remote import remote_manager, RemoteBox
+from remotemonitor.remote import remote_manager, RemoteBox
 
 
 def autodiscover():
@@ -19,15 +17,15 @@ def autodiscover():
 
         # Attempt to import the app's `moderators` module
         try:
-            mod = import_module('%s.remotes' % app)
+            remote_config_file = import_module('%s.remotes' % app)
             inspected_elements = inspect.getmembers(mod)
-            REMOTES = [i[1] for i in inspected_elements if i[0] == 'REMOTES'][0]
+            REMOTES = [i for i in inspected_elements if i[0] == 'REMOTES'][0]
 
             for configuration in REMOTES:
                 remote_box = RemoteBox(
                     **configuration
                 )
-                remote_manager.register_remote_box(remote_box)
+                remote_manager.register(remote_box)
         except ImportError:
             pass
 

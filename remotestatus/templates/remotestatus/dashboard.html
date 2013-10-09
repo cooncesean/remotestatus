@@ -1,0 +1,18 @@
+{% extends 'remotestatus/base.html' %}
+
+{% block content %}
+    <h1>Current Remote Box Status</h1>
+    <p class='fl'>
+        Last Updated On:
+        <form>
+            <select name='call_round' style='margin-top:-1px;margin-left:10px;'>
+                {% for cr in call_rounds %}
+                    <option {% if cr == call_round %}selected='True'{% endif %} value='{{ cr.id }}'>{{ cr }}</option>
+                {% endfor %}
+            </select>
+        </form>
+    </p>
+
+    {% include 'remotestatus/status_history_table.html' %}
+
+{% endblock %}
