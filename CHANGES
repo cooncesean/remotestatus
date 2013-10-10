@@ -1,2 +1,6 @@
 * 0.1.0
     * Initial commit
+* 0.1.1
+    * Framework is essentially working. Remote host autodiscover(registration),
+      status checks, error reporting and status logging is all up and working as
+      expected.

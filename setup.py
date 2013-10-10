@@ -4,7 +4,7 @@ from setuptools import setup
 setup(
     name='remotestatus',
     description='A Django app that checks the status (and optional processes) of remote boxes and stores their values for viewing.',
-    version='0.0.1',
+    version='0.1.1',
     author='Sean Coonce',
     author_email='cooncesean@gmail.com',
     packages=['remotestatus',],
