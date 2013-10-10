@@ -84,67 +84,15 @@ REMOTES = [
 You will now have to run `python manage.py syncdb` to add the `remotestatus` tables to your database. The status history for each of your boxes will be stored in the db.
 
 # How Does It Work
-Once the app is added to your `INSTALLED_APPS` and you have defined the necessary settings
+Once the app is added to your `INSTALLED_APPS`, you have defined the necessary settings and have created your `remotes.py` file, a periodic task will be fired every `REMOTE_CHECK_FREQUENCY` (default 30) minutes that will ssh to each of these boxes to assert that it is reachable and that the optionally specified `processes` are actually running on it.
 
+If any boxes are unreachable or are not running the specified processes, a notification email will be sent to `RS_USERS_TO_NOTIFY` with a rollup of what is wrong.
 
-### Autodiscover
-3. Will use autodiscover to find all apps wishing to contribute with a `remote.py` file
+The history of each remote status check is logged in the `remotestatus.StatusHistory` table.
 
-
-### Tasks
-4. Will set run a task every 10 minutes to check the status of boxes
 
 ### The Dashboard
-The dashboard is available at:
+The dashboard is available at: `http://localhost:8000/remotestatus/` and shows the status of all defined boxes by the most recent call to check them. You can view each remote host's history by clicking on it's `nickname` and you can change the date via the dropdown.
 
 
 
-
-
-
-
-
-
-
-
-
-
-Checking Status Of Recording Devices:
-
-1. One page summary of all distributed recording devices.
-Name    Location    Remote Port     Virtual Port    Status          Running Both Processes
-                                            (reachable/unreachable)        (yes/no)
-
-2. Means we need a mapping (either in DB or in a config file) for each box
-
-3. Script to log into each box using the settings specified and grep to see if that box
-   is running the scripts it should be.
-
-4. Save the output of that data for each box in redis.
-
-5. View/url/template to render the output.
-
-6. Notifications (via sms?) to be sent to administrators if any of the boxes is either unreachable
-   or is not running the scripts it should be.
-
-
-
-
-
-Usage:
-1. Add `remotestatus` to the list of your installed apps.
-2. Create a config file in any app with the remote boxes you wish to check the status of.
-CHECK_FREQUENCY = 10 * 60 * 60 # Runs every 10 minutes
-SSH_TUNNELING = True
-
-{
-    "proxy_hostname": "some.proxy-hostname.com",        # Typically the same for all proxy hosts
-    "proxy_username": "proxy-username"                  # Typically the same for all proxy hosts
-    "remote_username": "stomp2",                        # The username for the remote box you wish to connect to
-    "remote_password": "jordan23",                      # The password for the remote box
-    "port": 8001,                                       # The tunnelled port
-    "local_port": 1001,                                 # The local port mapping
-},
-....
-3. Will use autodiscover to find all apps wishing to contribute with a `remote.py` file
-4. Will set run a task every 10 minutes to check the status of boxes
