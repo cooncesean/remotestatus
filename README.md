@@ -26,13 +26,13 @@ You will also want to add a few new settings to configure the app. The app curre
 
 **your-project/settings.py:**
 ```python
-RS_USERS_TO_NOTIFY = ['some_admin@email.com', ...]          # List of users to notify in case of an outtage
-RS_KEY_FILE = 'path/to/ssh/key/file'                        # Path to the proxy's private key
-RS_KNOWN_HOSTS_FILE = 'path/to/projects/known_hosts'        # Path to the proxy's known_hosts
-RS_PROXY_HOSTNAME = 'proxy.hostname.com'                    # Proxy hostname
-RS_PROXY_USERNAME = 'proxy-user'                            # Proxy username
-RS_PROXY_PORT = 22                                          # Proxy SSH port
-REMOTE_CHECK_FREQUENCY = 30                                 # Optional minutes you wish to check the remote boxes
+RS_USERS_TO_NOTIFY = ['some_admin@email.com', ...]      # List of users to notify in case of an outtage
+RS_KEY_FILE = 'path/to/ssh/key/file'                    # Path to the proxy's private key
+RS_KNOWN_HOSTS_FILE = 'path/to/projects/known_hosts'    # Path to the proxy's known_hosts
+RS_PROXY_HOSTNAME = 'proxy.hostname.com'                # Proxy hostname
+RS_PROXY_USERNAME = 'proxy-user'                        # Proxy username
+RS_PROXY_PORT = 22                                      # Proxy SSH port
+REMOTE_CHECK_FREQUENCY = 30                             # Optional minutes you wish to check the remote boxes
 ```
 
 ### Urls
