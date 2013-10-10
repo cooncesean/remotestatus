@@ -1,10 +1,13 @@
 import json
 
+from django.core.mail import send_mail
+
 from paramiko import SSHClient
 from paramiko.transport import ChannelException
 
 from remotestatus.conf import DEFAULT_PROXY_HOSTNAME, DEFAULT_PROXY_USERNAME, \
-    DEFAULT_PROXY_PORT, DEFAULT_KEY_FILE, DEFAULT_KNOWN_HOSTS_FILE
+    DEFAULT_PROXY_PORT, DEFAULT_KEY_FILE, DEFAULT_KNOWN_HOSTS_FILE, \
+    USERS_TO_NOTIFY, NOTIFICATION_EMAIL_ADDRESS
 from remotestatus.models import StatusHistory, RemoteBoxModel
 
 
@@ -19,6 +22,36 @@ class RemoteManager(object):
 
     def register_remote_box(self, remote_box):
         self.registry.update({remote_box.nickname: remote_box})
+
+    def notify_admin(self, unreachable_remotes, invalid_procs):
+        """
+        Notify the necessary users with a rollup email regarding
+        the remote boxes that were invalid.
+
+        Expects a two lists of RemoteBoxes that were unreachable or
+        have expected procs that are not running.
+        """
+        total_down = len(unreachable_remotes) + len(invalid_procs)
+
+        # Build message body
+        body = '''%(count)d of your remote boxes are currently unreachable or
+        have expected processes that are not running.\n\n
+
+        Unreachable Boxes: %(unreachable)s
+        Reachable But Invalid Processes: %(invalid_procs)s
+        ''' % {
+            'count': total_down,
+            'unreachable': '\n'.join([i.nickname for i in unreachable_remotes]),
+            'invalid_procs': '\n'.join([i.nickname for i in invalid_procs])
+        }
+
+        send_mail(
+            'ResponseStatus: %d of your remote boxes are down.' % total_down,
+            body,
+            NOTIFICATION_EMAIL_ADDRESS,
+            USERS_TO_NOTIFY,
+            fail_silently=False
+        )
 
 remote_manager = RemoteManager()
 
@@ -80,6 +113,7 @@ class RemoteBox(object):
                 username=DEFAULT_PROXY_USERNAME,
                 key_filename=DEFAULT_KEY_FILE
             )
+            print 'connected to proxy'
 
             # Get the transport and find create a `direct-tcpip` channel
             transport = proxy_client.get_transport()
@@ -97,6 +131,7 @@ class RemoteBox(object):
                 password=self.remote_password,
                 sock=channel
             )
+            print 'connected to remote host'
 
             # The remote box is up
             box_status = True
@@ -109,7 +144,7 @@ class RemoteBox(object):
 
         # Box is up, check the status of each process in the list
         for proc in self.processes:
-            print 'executing command: `%s`' % proc
+            print 'checking process: `%s`' % proc
             x, stdout, e = remote_client.exec_command('ps aux | grep %s | grep -v grep' % proc)
             out = stdout.readlines()
             print 'out', out
@@ -117,9 +152,6 @@ class RemoteBox(object):
             proc_statuses.update({proc: len(out) > 0})
 
         return (box_status, proc_statuses)
-
-    def notify_user(self, email_addresses):
-        " Notify the necessary users when a box is not responsive. "
 
     def save_status_history(self, call_round, status):
         """
@@ -138,3 +170,11 @@ class RemoteBox(object):
             box_status=status[0],
             processes_output=json.dumps(status[1])
         )
+
+    def is_reachable(self, status):
+        " Returns True/False based on whether or not the remote box was up. "
+        return status[0]
+
+    def has_valid_procs(self, status):
+        " Returns True/false based on whether or not the remote is running its expected procs. "
+        return False not in [i for i in status[1].values()]

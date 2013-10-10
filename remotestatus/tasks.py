@@ -19,13 +19,23 @@ def monitor_remote_status():
     # Incr the `call_round` for this 'round' of remote calls
     call_round = CallRound.objects.create(date_checked=now())
 
+    # Collect the downed boxes/processes and eventually alert admins
+    unreachable_remotes = []
+    invalid_procs = []
+
     for remote_box in remote_manager.registry.values():
         # Get status of the box
         status = remote_box.check_remote_status()
 
-        # If status is `down` contact necessary users
-        if status[0] == False:
-            remote_box.notify_user(settings.RS_NOTIFY_USERS)
+        if not remote_box.is_reachable(status):
+            unreachable_remotes.append(remote_box)
+        elif not remote_box.has_valid_procs(status):
+            invalid_procs.append(remote_box)
 
         # Update the datastore with the status of the box
         remote_box.save_status_history(call_round, status)
+
+    # Send a rollup notification to the admin about all unreachable remote boxes
+    print 'UNREACHABLE REMOTES: %d' % len(unreachable_remotes)
+    print 'INVALID PROCS: %d' % len(invalid_procs)
+    remote_manager.notify_admin(unreachable_remotes, invalid_procs)
